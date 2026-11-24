@@ -1,0 +1,7 @@
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),ts=require('typescript'),assert=require('node:assert/strict'),XLSX=require('xlsx');
+// Temporary directory inside repository, so Node resolves the installed SheetJS.
+const dir=fs.mkdtempSync(path.join(__dirname,'../.test-excel-'));
+fs.writeFileSync(path.join(dir,'package.json'),'{"type":"commonjs"}');
+(async()=>{try{for(const name of ['schema','demo','excel']){const src=fs.readFileSync(path.join(__dirname,'../src/data',name+'.ts'),'utf8');fs.writeFileSync(path.join(dir,name+'.js'),ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText);}
+const {importDB}=require(path.join(dir,'excel.js'));const source=fs.readFileSync(path.join(__dirname,'../public/Plantilla_Pension2000.xlsx'));const result=await importDB(new File([source],'Plantilla.xlsx'));assert.equal(result.db.Clientes.length,10);assert.equal(result.db.Clientes[0].NSS,'00000000001');assert.equal(result.warnings.length,0);
+const invalid=XLSX.utils.book_new();XLSX.utils.book_append_sheet(invalid,XLSX.utils.aoa_to_sheet([['NSS'],['00000000001']]),'Clientes');const bytes=XLSX.write(invalid,{type:'buffer',bookType:'xlsx'});await assert.rejects(importDB(new File([bytes],'incorrecto.xlsx')),/faltan columnas/);await assert.rejects(importDB(new File(['test'],'incorrecto.txt')),/Seleccione/);console.log('OK: importación XLSX y validaciones.');}finally{fs.rmSync(dir,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1});
